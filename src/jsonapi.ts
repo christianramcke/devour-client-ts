@@ -52,8 +52,8 @@ export class JsonApi {
   public auth: { [key: string]: string };
   private readonly apiUrl: string;
   public bearer: string;
-  private logger: boolean;
-  private loglevel: LogLevel;
+  private readonly logger: boolean;
+  private readonly loglevel: LogLevel;
   private readonly models: { [key: string]: any };
   private deserialize: any;
   private serialize: any;

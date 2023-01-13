@@ -18,7 +18,7 @@ export class Logger {
     }
   }
 
-  static setLogLevel(loglevel: LogLevel) {
+  static setLogLevel(loglevel: LogLevel | string) {
     this.instantiate().setLogLevel(loglevel);
   }
 
@@ -66,7 +66,10 @@ export class Logger {
     this.logger.debug(message);
   }
 
-  private setLogLevel(loglevel: LogLevel) {
+  private setLogLevel(loglevel: LogLevel | string) {
+    if (typeof loglevel === 'string') {
+      loglevel = LogLevel[loglevel.toUpperCase()];
+    }
     if (loglevel.valueOf() >= LogLevel.NONE.valueOf()) {
       Minilog.disable();
       return;
