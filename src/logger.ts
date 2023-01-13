@@ -9,12 +9,12 @@ export enum LogLevel {
 }
 
 export class Logger {
-  private readonly name = 'devour-client-ts';
+  private static readonly LOGGER_NAME = 'devour-client-ts';
   private readonly logger: Minilog;
 
   constructor() {
     if (!this.logger) {
-      this.logger = Minilog(this.name);
+      this.logger = Minilog(Logger.LOGGER_NAME);
     }
   }
 
@@ -76,13 +76,13 @@ export class Logger {
     }
     const filter = new Minilog.Filter();
     if (loglevel.valueOf() >= LogLevel.ERROR.valueOf()) {
-      filter.deny(this.name, 'warn');
+      filter.deny(Logger.LOGGER_NAME, 'warn');
     }
     if (loglevel.valueOf() >= LogLevel.WARN.valueOf()) {
-      filter.deny(this.name, 'info');
+      filter.deny(Logger.LOGGER_NAME, 'info');
     }
     if (loglevel.valueOf() >= LogLevel.INFO.valueOf()) {
-      filter.deny(this.name, 'debug');
+      filter.deny(Logger.LOGGER_NAME, 'debug');
     }
     Minilog.pipe(filter) // filter
       .pipe(Minilog.defaultFormatter) // formatter
