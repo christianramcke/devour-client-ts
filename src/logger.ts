@@ -71,20 +71,19 @@ export class Logger {
       loglevel = LogLevel[loglevel.toUpperCase()];
     }
     if (loglevel.valueOf() >= LogLevel.NONE.valueOf()) {
-      Minilog.disable();
+      Logger.disable();
       return;
     }
-    const filter = new Minilog.Filter();
     if (loglevel.valueOf() >= LogLevel.ERROR.valueOf()) {
-      filter.deny(Logger.LOGGER_NAME, 'warn');
+      Minilog.suggest.deny(Logger.LOGGER_NAME, 'warn');
     }
     if (loglevel.valueOf() >= LogLevel.WARN.valueOf()) {
-      filter.deny(Logger.LOGGER_NAME, 'info');
+      Minilog.suggest.deny(Logger.LOGGER_NAME, 'info');
     }
     if (loglevel.valueOf() >= LogLevel.INFO.valueOf()) {
-      filter.deny(Logger.LOGGER_NAME, 'debug');
+      Minilog.suggest.deny(Logger.LOGGER_NAME, 'debug');
     }
-    Minilog.pipe(filter) // filter
+    Minilog.pipe(Minilog.suggest) // filter
       .pipe(Minilog.defaultFormatter) // formatter
       .pipe(Minilog.defaultBackend); // backend - e.g. the console
   }
