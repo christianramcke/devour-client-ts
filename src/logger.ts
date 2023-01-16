@@ -83,8 +83,5 @@ export class Logger {
     if (loglevel.valueOf() >= LogLevel.INFO.valueOf()) {
       Minilog.suggest.deny(Logger.LOGGER_NAME, 'debug');
     }
-    Minilog.pipe(Minilog.suggest) // filter
-      .pipe(Minilog.defaultFormatter) // formatter
-      .pipe(Minilog.defaultBackend); // backend - e.g. the console
   }
 }
