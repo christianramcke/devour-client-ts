@@ -1,7 +1,7 @@
 /* global describe, it, before */
 /* eslint-disable no-unused-expressions */
 
-import { JsonApi } from '../../src/jsonapi';
+import { JsonApi } from '../../src';
 import * as deserialize from '../../src/middleware/json-api/_deserialize';
 import { expect } from 'chai';
 
@@ -177,6 +177,314 @@ describe('deserialize', () => {
     expect(productWithTags.childTags[2].id).to.eql('11');
     expect(productWithTags.childTags[2].type).to.eql('tags');
     expect(productWithTags.childTags[2].name).to.eql('two');
+  });
+
+  it('should deserialize complex relations without going into an infinite loop with depth >2', () => {
+    jsonApi.define('topic', {
+      id: '',
+      name: '',
+      parentTopicId: '',
+      frameworkId: '',
+      topicTypeId: '',
+      topicTypeLevel: -1,
+      topicTypeName: '',
+      parentTopic: {
+        jsonApi: 'hasOne',
+        type: 'topics'
+      },
+      parentTopics: {
+        jsonApi: 'hasMany',
+        type: 'topics'
+      },
+      childTopics: {
+        jsonApi: 'hasMany',
+        type: 'topics'
+      },
+      framework: {
+        jsonApi: 'hasOne',
+        type: 'frameworks'
+      },
+      strategyReferences: {
+        jsonApi: 'hasMany',
+        type: 'strategy_references'
+      }
+    });
+    jsonApi.define('framework', {
+      id: '',
+      name: '',
+      topicTypes: {
+        jsonApi: 'hasMany',
+        type: 'topic_types'
+      },
+      topics: {
+        jsonApi: 'hasMany',
+        type: 'topics'
+      }
+    });
+    jsonApi.define('strategy_reference', {
+      id: '',
+      topicId: '',
+      meaningId: '',
+      commentHtml: '',
+      commentJson: {} as JSON,
+      priorityId: '',
+      projectId: '',
+      strategyId: ''
+    });
+    const mockResponse = {
+      data: {
+        id: '1',
+        type: 'topics',
+        attributes: {
+          level: 2,
+          id: '1',
+          name: 'Subsubtopic',
+          parentTopicId: '5',
+          topicTypeId: '8',
+          topicTypeName: 'Subsubtopic-Type',
+          topicTypeLevel: 2
+        },
+        relationships: {
+          framework: {
+            data: {
+              id: '11',
+              type: 'frameworks'
+            }
+          },
+          topicType: {
+            data: {
+              id: '8',
+              type: 'topic_types'
+            }
+          },
+          parentTopic: {
+            data: {
+              id: '5',
+              type: 'topics'
+            }
+          },
+          parentTopics: {
+            data: [
+              {
+                id: '5',
+                type: 'topics'
+              },
+              {
+                id: '9',
+                type: 'topics'
+              }
+            ]
+          },
+          childTopics: {
+            data: []
+          },
+          strategyReferences: {
+            data: []
+          },
+          topicKpiRelations: {
+            data: []
+          }
+        },
+        links: {
+          self: 'https://some-api/topics/1'
+        }
+      },
+      meta: {
+        pagination: {},
+        requestId: '2',
+        roleName: 'admin'
+      },
+      links: {
+        self: 'https://some-api/topics/1?include=parentTopics%2CstrategyReferences%2CchildTopics%2Cframework'
+      },
+      included: [
+        {
+          id: '5',
+          type: 'topics',
+          attributes: {
+            level: 1,
+            id: '5',
+            name: 'Subtopic',
+            parentTopicId: '9',
+            topicTypeId: '14',
+            topicTypeName: 'Subtopic-Type',
+            topicTypeLevel: 1
+          },
+          relationships: {
+            framework: {
+              data: {
+                id: '11',
+                type: 'frameworks'
+              }
+            },
+            topicType: {
+              data: {
+                id: '14',
+                type: 'topic_types'
+              }
+            },
+            parentTopic: {
+              data: {
+                id: '9',
+                type: 'topics'
+              }
+            },
+            parentTopics: {
+              data: [
+                // possible loop with 5
+                {
+                  id: '9',
+                  type: 'topics'
+                }
+              ]
+            },
+            childTopics: {
+              data: [
+                {
+                  id: '1',
+                  type: 'topics'
+                }
+              ]
+            },
+            strategyReferences: {
+              data: []
+            },
+            topicKpiRelations: {
+              data: []
+            }
+          },
+          links: {
+            self: 'https://some-api/topics/5'
+          }
+        },
+        {
+          id: '9',
+          type: 'topics',
+          attributes: {
+            level: 0,
+            id: '9',
+            name: 'Topic',
+            parentTopicId: null,
+            topicTypeId: '18',
+            topicTypeName: 'Topic-Type',
+            topicTypeLevel: 0
+          },
+          relationships: {
+            framework: {
+              data: {
+                id: '11',
+                type: 'frameworks'
+              }
+            },
+            topicType: {
+              data: {
+                id: '18',
+                type: 'topic_types'
+              }
+            },
+            parentTopic: {
+              data: null
+            },
+            parentTopics: {
+              data: []
+            },
+            childTopics: {
+              data: [
+                // possible loop with 9
+                {
+                  id: '5',
+                  type: 'topics'
+                }
+              ]
+            },
+            strategyReferences: {
+              data: [
+                {
+                  id: '22',
+                  type: 'strategy_references'
+                }
+              ]
+            },
+            topicKpiRelations: {
+              data: []
+            }
+          },
+          links: {
+            self: 'https://some-api/topics/9'
+          }
+        },
+        {
+          id: '11',
+          type: 'frameworks',
+          attributes: {
+            id: '11',
+            name: 'Some framework'
+          },
+          relationships: {
+            contributors: {
+              data: []
+            },
+            strategies: {
+              data: [
+                {
+                  id: '19',
+                  type: 'strategies'
+                }
+              ]
+            },
+            topics: {
+              data: [
+                {
+                  id: '1',
+                  type: 'topics'
+                },
+                {
+                  id: '5',
+                  type: 'topics'
+                },
+                {
+                  id: '9',
+                  type: 'topics'
+                },
+                {
+                  id: '30',
+                  type: 'topics'
+                },
+                {
+                  id: '32',
+                  type: 'topics'
+                }
+              ]
+            },
+            topicTypes: {
+              data: [
+                {
+                  id: '18',
+                  type: 'topic_types'
+                },
+                {
+                  id: '14',
+                  type: 'topic_types'
+                },
+                {
+                  id: '8',
+                  type: 'topic_types'
+                }
+              ]
+            }
+          },
+          links: {
+            self: 'https://some-api/frameworks/11'
+          }
+        }
+      ]
+    };
+    const res = deserialize.resource.call(
+      jsonApi,
+      mockResponse.data,
+      mockResponse.included
+    );
+    expect(res.id).to.eql('1');
   });
 
   it('should deserialize hasMany relations', () => {
