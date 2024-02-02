@@ -24,6 +24,8 @@ interface CachedItem {
   deserialized: any;
 }
 
+export const visitedNodes = new Set<string>();
+
 export const cache = new (class {
   _cache: CachedItem[];
 
@@ -49,13 +51,16 @@ export const cache = new (class {
   }
 })();
 
-export function collection(items, included, useCache = false, depth = 0) {
+export function collection(items, included, useCache = false) {
+  visitedNodes.clear();
   return items.map((item) => {
-    return resource.call(this, item, included, useCache, depth);
+    return resource.call(this, item, included, useCache);
   });
 }
 
-export function resource(item, included, useCache = false, depth = 0) {
+export function resource(item, included, useCache = false) {
+  const deserializedModel = { id: item.id, type: item.type };
+
   if (useCache) {
     const cachedItem = cache.get(item.type, item.id);
     if (cachedItem) return cachedItem;
@@ -65,8 +70,6 @@ export function resource(item, included, useCache = false, depth = 0) {
   if (model.options.deserializer) {
     return model.options.deserializer.call(this, item, included);
   }
-
-  const deserializedModel = { id: item.id, type: item.type };
 
   forOwn(item.attributes, (value, attr) => {
     let attrConfig = model.attributes[attr];
@@ -122,8 +125,7 @@ export function resource(item, included, useCache = false, depth = 0) {
         relConfig,
         item,
         included,
-        key,
-        depth
+        key
       );
     }
   });
@@ -143,33 +145,14 @@ function attachRelationsFor(
   attribute: RelationConfig,
   item,
   included,
-  key,
-  depth = 0
+  key
 ) {
-  let relation = null;
   if (attribute.relation.jsonApi === 'hasOne') {
-    relation = attachHasOneFor.call(
-      this,
-      model,
-      attribute,
-      item,
-      included,
-      key,
-      depth + 1
-    );
+    return attachHasOneFor.call(this, model, attribute, item, included, key);
   }
   if (attribute.relation.jsonApi === 'hasMany') {
-    relation = attachHasManyFor.call(
-      this,
-      model,
-      attribute,
-      item,
-      included,
-      key,
-      depth + 1
-    );
+    return attachHasManyFor.call(this, model, attribute, item, included, key);
   }
-  return relation;
 }
 
 function attachHasOneFor(
@@ -200,16 +183,13 @@ function attachHasManyFor(
   attribute: RelationConfig,
   item,
   included,
-  key,
-  depth
+  key
 ) {
-  if (depth > 2) {
-    const message =
-      'Depth of relationships is too deep (>2). Stopping deserialization.';
-    Logger.warn(message);
-    console.warn(message);
-    return [];
+  const nodeIdentifier = `${item.type}:${item.id}`;
+  if (visitedNodes.has(nodeIdentifier)) {
+    return null;
   }
+  visitedNodes.add(nodeIdentifier);
 
   if (!item.relationships) {
     return null;
@@ -217,7 +197,7 @@ function attachHasManyFor(
 
   const relatedItems = relatedItemsFor(model, attribute, item, included, key);
   if (relatedItems && relatedItems.length > 0) {
-    return collection.call(this, relatedItems, included, false, depth);
+    return collection.call(this, relatedItems, included, false);
   }
 
   const relationshipData = get(item.relationships, [key, 'data'], false);
