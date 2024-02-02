@@ -474,6 +474,7 @@ export class JsonApi {
       }),
       catchError((err) => {
         Logger.error(err);
+        console.error(err);
         return this.applyErrorMiddleware(err);
       })
     );
