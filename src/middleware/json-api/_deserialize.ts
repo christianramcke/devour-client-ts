@@ -24,8 +24,6 @@ interface CachedItem {
   deserialized: any;
 }
 
-export const visitedNodes = new Set<string>();
-
 export const cache = new (class {
   _cache: CachedItem[];
 
@@ -51,14 +49,13 @@ export const cache = new (class {
   }
 })();
 
-export function collection(items, included, useCache = false) {
-  visitedNodes.clear();
+export function collection(items, included, useCache = true) {
   return items.map((item) => {
     return resource.call(this, item, included, useCache);
   });
 }
 
-export function resource(item, included, useCache = false) {
+export function resource(item, included, useCache = true) {
   const deserializedModel = { id: item.id, type: item.type };
 
   if (useCache) {
@@ -185,19 +182,14 @@ function attachHasManyFor(
   included,
   key
 ) {
-  const nodeIdentifier = `${item.type}:${item.id}`;
-  if (visitedNodes.has(nodeIdentifier)) {
-    return null;
-  }
-  visitedNodes.add(nodeIdentifier);
-
   if (!item.relationships) {
     return null;
   }
 
   const relatedItems = relatedItemsFor(model, attribute, item, included, key);
+
   if (relatedItems && relatedItems.length > 0) {
-    return collection.call(this, relatedItems, included, false);
+    return collection.call(this, relatedItems, included, true);
   }
 
   const relationshipData = get(item.relationships, [key, 'data'], false);
