@@ -13,8 +13,19 @@ import {
   matches
 } from 'lodash';
 
+interface RelationConfig {
+  attribute: string;
+  relation: any;
+}
+
+interface CachedItem {
+  type: string;
+  id: string;
+  deserialized: any;
+}
+
 export const cache = new (class {
-  _cache: any[];
+  _cache: CachedItem[];
 
   constructor() {
     this._cache = [];
@@ -38,23 +49,24 @@ export const cache = new (class {
   }
 })();
 
-export function collection(items, included, useCache = false) {
+export function collection(items, included, useCache = true) {
   return items.map((item) => {
     return resource.call(this, item, included, useCache);
   });
 }
 
-export function resource(item, included, useCache = false) {
+export function resource(item, included, useCache = true) {
+  const deserializedModel = { id: item.id, type: item.type };
+
   if (useCache) {
     const cachedItem = cache.get(item.type, item.id);
     if (cachedItem) return cachedItem;
   }
 
   const model = this.modelFor(this.pluralize.singular(item.type));
-  if (model.options.deserializer)
+  if (model.options.deserializer) {
     return model.options.deserializer.call(this, item, included);
-
-  const deserializedModel = { id: item.id, type: item.type };
+  }
 
   forOwn(item.attributes, (value, attr) => {
     let attrConfig = model.attributes[attr];
@@ -76,24 +88,30 @@ export function resource(item, included, useCache = false) {
   });
 
   // Important: cache before parsing relationships to avoid infinite loop
-  cache.set(item.type, item.id, deserializedModel);
+  if (useCache) cache.set(item.type, item.id, deserializedModel);
 
   forOwn(item.relationships, (value, rel) => {
-    let relConfig = model.attributes[rel];
+    let relConfig: RelationConfig = {
+      attribute: rel,
+      relation: model.attributes[rel]
+    };
     const key = rel;
 
-    if (isUndefined(relConfig)) {
+    if (isUndefined(relConfig.relation)) {
       rel = rel.replace(/-([a-z])/g, function (g) {
         return g[1].toUpperCase();
       });
-      relConfig = model.attributes[rel];
+      relConfig = {
+        attribute: rel,
+        relation: model.attributes[rel]
+      };
     }
 
-    if (isUndefined(relConfig)) {
+    if (isUndefined(relConfig.relation)) {
       Logger.warn(
         `Resource response for type "${item.type}" contains relationship "${rel}", but it is not present on model config and therefore not deserialized.`
       );
-    } else if (!isRelationship(relConfig)) {
+    } else if (!isRelationship(relConfig.relation)) {
       Logger.warn(
         `Resource response for type "${item.type}" contains relationship "${rel}", but it is present on model config as a plain attribute.`
       );
@@ -119,32 +137,28 @@ export function resource(item, included, useCache = false) {
   return deserializedModel;
 }
 
-function attachRelationsFor(model, attribute, item, included, key) {
-  let relation = null;
-  if (attribute.jsonApi === 'hasOne') {
-    relation = attachHasOneFor.call(
-      this,
-      model,
-      attribute,
-      item,
-      included,
-      key
-    );
+function attachRelationsFor(
+  model,
+  attribute: RelationConfig,
+  item,
+  included,
+  key
+) {
+  if (attribute.relation.jsonApi === 'hasOne') {
+    return attachHasOneFor.call(this, model, attribute, item, included, key);
   }
-  if (attribute.jsonApi === 'hasMany') {
-    relation = attachHasManyFor.call(
-      this,
-      model,
-      attribute,
-      item,
-      included,
-      key
-    );
+  if (attribute.relation.jsonApi === 'hasMany') {
+    return attachHasManyFor.call(this, model, attribute, item, included, key);
   }
-  return relation;
 }
 
-function attachHasOneFor(model, attribute, item, included, key) {
+function attachHasOneFor(
+  model,
+  attribute: RelationConfig,
+  item,
+  included,
+  key
+) {
   if (!item.relationships) {
     return null;
   }
@@ -161,14 +175,21 @@ function attachHasOneFor(model, attribute, item, included, key) {
   return null;
 }
 
-function attachHasManyFor(model, attribute, item, included, key) {
+function attachHasManyFor(
+  model,
+  attribute: RelationConfig,
+  item,
+  included,
+  key
+) {
   if (!item.relationships) {
     return null;
   }
 
   const relatedItems = relatedItemsFor(model, attribute, item, included, key);
+
   if (relatedItems && relatedItems.length > 0) {
-    return collection.call(this, relatedItems, included, false);
+    return collection.call(this, relatedItems, included, true);
   }
 
   const relationshipData = get(item.relationships, [key, 'data'], false);
@@ -186,11 +207,21 @@ function isRelationship(attribute) {
   );
 }
 
-/*
- *   == relatedItemsFor
- *   Returns unserialized related items.
+/**
+ * Returns unserialized related items.
+ * @param model
+ * @param attribute
+ * @param item
+ * @param included
+ * @param key
  */
-function relatedItemsFor(model, attribute, item, included, key) {
+function relatedItemsFor(
+  model,
+  attribute: RelationConfig,
+  item,
+  included,
+  key
+) {
   const relationMap = get(item.relationships, [key, 'data'], false);
   if (!relationMap) {
     return [];
@@ -211,10 +242,14 @@ function relatedItemsFor(model, attribute, item, included, key) {
   }
 }
 
-function isRelatedItemFor(attribute, relatedItem, relationMapItem) {
+function isRelatedItemFor(
+  attribute: RelationConfig,
+  relatedItem,
+  relationMapItem
+) {
   let passesFilter = true;
-  if (attribute.filter) {
-    passesFilter = matches(relatedItem.attributes)(attribute.filter);
+  if (attribute.relation.filter) {
+    passesFilter = matches(relatedItem.attributes)(attribute.relation.filter);
   }
   return (
     relatedItem.id === relationMapItem.id &&
